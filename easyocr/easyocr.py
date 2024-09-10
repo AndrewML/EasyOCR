@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .recognition import get_recognizer, get_text
+from .recognition import get_recognizer, get_text, get_text_polys
 from .utils import group_text_box, get_image_list, calculate_md5, get_paragraph,\
                    download_and_unzip, printProgressBar, diff, reformat_input,\
                    make_rotated_img_list, set_result_with_confidence,\
@@ -242,6 +242,7 @@ class Reader(object):
             else:
                 raise RuntimeError("Unsupport detector network. Support networks are craft and dbnet18.")
             self.get_textbox = get_textbox
+            self.get_text_polys = get_text_polys
             self.get_detector = get_detector
             corrupt_msg = 'MD5 hash mismatch, possible file corruption'
             detector_path = os.path.join(self.model_storage_directory, self.detection_models[self.detect_network]['filename'])
@@ -349,6 +350,50 @@ class Reader(object):
             free_list_agg.append(free_list)
 
         return horizontal_list_agg, free_list_agg
+    
+    
+    def detect_polys(self, img, min_size = 20, text_threshold = 0.7, low_text = 0.4,\
+               link_threshold = 0.4,canvas_size = 2560, mag_ratio = 1.,\
+               slope_ths = 0.1, ycenter_ths = 0.5, height_ths = 0.5,\
+               width_ths = 0.5, add_margin = 0.1, reformat=True, optimal_num_chars=None,
+               threshold = 0.2, bbox_min_score = 0.2, bbox_min_size = 3, max_candidates = 0,
+               ):
+
+        if reformat:
+            img, img_cv_grey = reformat_input(img)
+
+        polys_list = self.get_text_polys(self.detector, 
+                                    img, 
+                                    canvas_size = canvas_size, 
+                                    mag_ratio = mag_ratio,
+                                    text_threshold = text_threshold, 
+                                    link_threshold = link_threshold, 
+                                    low_text = low_text,
+                                    poly = True, 
+                                    device = self.device, 
+                                    optimal_num_chars = optimal_num_chars,
+                                    threshold = threshold, 
+                                    bbox_min_score = bbox_min_score, 
+                                    bbox_min_size = bbox_min_size, 
+                                    max_candidates = max_candidates,
+                                    )
+
+        # horizontal_list_agg, free_list_agg = [], []
+        # for text_box in text_box_list:
+        #     horizontal_list, free_list = group_text_box(text_box, slope_ths,
+        #                                                 ycenter_ths, height_ths,
+        #                                                 width_ths, add_margin,
+        #                                                 (optimal_num_chars is None))
+        #     if min_size:
+        #         horizontal_list = [i for i in horizontal_list if max(
+        #             i[1] - i[0], i[3] - i[2]) > min_size]
+        #         free_list = [i for i in free_list if max(
+        #             diff([c[0] for c in i]), diff([c[1] for c in i])) > min_size]
+        #     horizontal_list_agg.append(horizontal_list)
+        #     free_list_agg.append(free_list)
+
+        return polys_list
+
 
     def recognize(self, img_cv_grey, horizontal_list=None, free_list=None,\
                   decoder = 'greedy', beamWidth= 5, batch_size = 1,\
@@ -436,6 +481,23 @@ class Reader(object):
             return merge_to_free(result, free_list)
         else:
             return result
+
+    def get_polys(self, img, text_threshold = 0.7, link_threshold = 0.4,\
+                  low_text = 0.4, canvas_size = 2560, mag_ratio = 1.,\
+                      slope_ths = 0.1, ycenter_ths = 0.5, height_ths = 0.5,\
+                          width_ths = 0.5, add_margin = 0.1, min_size = 20,
+                          threshold = 0.2, bbox_min_score = 0.2, bbox_min_size = 3, max_candidates = 0):  
+        polys = self.detect_polys(img, 
+                            min_size = min_size, text_threshold = text_threshold,\
+                            low_text = low_text, link_threshold = link_threshold,\
+                            canvas_size = canvas_size, mag_ratio = mag_ratio,\
+                            slope_ths = slope_ths, ycenter_ths = ycenter_ths,\
+                            height_ths = height_ths, width_ths= width_ths,\
+                            add_margin = add_margin, reformat = False,\
+                            threshold = threshold, bbox_min_score = bbox_min_score,\
+                            bbox_min_size = bbox_min_size, max_candidates = max_candidates
+                            )
+        return polys
 
     def readtext(self, image, decoder = 'greedy', beamWidth= 5, batch_size = 1,\
                  workers = 0, allowlist = None, blocklist = None, detail = 1,\

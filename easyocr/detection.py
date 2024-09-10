@@ -108,3 +108,25 @@ def get_textbox(detector, image, canvas_size, mag_ratio, text_threshold, link_th
         result.append(single_img_result)
 
     return result
+
+
+def get_text_polys(detector, image, canvas_size, mag_ratio, text_threshold, link_threshold,
+                   low_text, poly, device, optimal_num_chars=None, **kwargs):
+    result = []
+    estimate_num_chars = optimal_num_chars is not None
+    bboxes_list, polys_list = test_net(canvas_size, mag_ratio, detector,
+                                       image, text_threshold,
+                                       link_threshold, low_text, poly,
+                                       device, estimate_num_chars)
+    if estimate_num_chars:
+        polys_list = [[p for p, _ in sorted(polys, key=lambda x: abs(optimal_num_chars - x[1]))]
+                      for polys in polys_list]
+
+    # for polys in polys_list:
+    #     single_img_result = []
+    #     for i, box in enumerate(polys):
+    #         poly = np.array(box).astype(np.int32).reshape((-1))
+    #         single_img_result.append(poly)
+    #     result.append(single_img_result)
+
+    return polys_list
